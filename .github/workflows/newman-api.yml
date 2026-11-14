@@ -21,10 +21,10 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install Newman and HTML Reporter
+      - name: Install Newman
         run: npm install -g newman@6.2.3 newman-reporter-htmlextra@1.23.1
 
-      - name: Run Postman Collection & Generate Reports
+      - name: Run collection
         run: |
           mkdir -p reports
           newman run Restful-Booker.postman_collection.json \
@@ -32,7 +32,7 @@ jobs:
             --reporter-junit-export reports/newman-results.xml \
             --reporter-htmlextra-export reports/newman-report.html
 
-      - name: Upload Newman Test Reports
+      - name: Upload reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
