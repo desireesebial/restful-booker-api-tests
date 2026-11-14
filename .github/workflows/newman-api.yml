@@ -7,9 +7,13 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   api-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -17,8 +21,21 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install Newman
-        run: npm install -g newman
+      - name: Install Newman and HTML Reporter
+        run: npm install -g newman@6.2.3 newman-reporter-htmlextra@1.23.1
 
-      - name: Run Postman Collection
-        run: newman run Restful-Booker.postman_collection.json
+      - name: Run Postman Collection & Generate Reports
+        run: |
+          mkdir -p reports
+          newman run Restful-Booker.postman_collection.json \
+            -r cli,junit,htmlextra \
+            --reporter-junit-export reports/newman-results.xml \
+            --reporter-htmlextra-export reports/newman-report.html
+
+      - name: Upload Newman Test Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: newman-api-reports
+          path: reports/
+          retention-days: 7
