@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "b8f9a2d1-4c3e-4a9b-8f1a-9e2d3c4b5a6f",
     "name": "Restful-Booker API Tests",
-    "description": "Stateful chained API test suite and isolated negative test suite for Restful-Booker with dynamic date generation, schema validation, state-immutability checks, and guaranteed cleanup.",
+    "description": "Chained booking flow plus negative tests for Restful-Booker",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -73,7 +73,7 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "// 1) Dynamic ISO dates (YYYY-MM-DD), regenerated once per calendar day so values never go stale in the Postman app",
+          "// Booking dates: tomorrow, +6 days and +10 days. Regenerated once a day.",
           "const today = new Date().toISOString().split('T')[0];",
           "if (pm.collectionVariables.get('datesGeneratedOn') !== today) {",
           "    const addDays = (days) => new Date(Date.now() + days * 86400000).toISOString().split('T')[0];",
@@ -83,7 +83,7 @@
           "    pm.collectionVariables.set('datesGeneratedOn', today);",
           "}",
           "",
-          "// 2) Shared JSON schemas, defined once and reused by every test script",
+          "// JSON schemas used by the tests",
           "const datePattern = '^\\\\d{4}-\\\\d{2}-\\\\d{2}$';",
           "const bookingSchema = {",
           "    type: 'object',",
@@ -121,10 +121,10 @@
   ],
   "item": [
     {
-      "name": "Chained Booking Workflow",
+      "name": "Booking lifecycle (chained)",
       "item": [
         {
-          "name": "1. Generate Auth Token (POST /auth)",
+          "name": "1. Get token (POST /auth)",
           "event": [
             {
               "listen": "test",
@@ -140,11 +140,11 @@
                   "});",
                   "",
                   "const jsonData = pm.response.json();",
-                  "pm.test('Response contains valid non-empty string token', function () {",
+                  "pm.test('Token is a non-empty string', function () {",
                   "    pm.expect(jsonData).to.be.an('object');",
                   "    pm.expect(jsonData.token).to.be.a('string').and.not.empty;",
                   "});",
-                  "pm.test('Response matches token JSON Schema', function () {",
+                  "pm.test('Response matches the token schema', function () {",
                   "    pm.response.to.have.jsonSchema(JSON.parse(pm.variables.get('tokenSchema')));",
                   "});",
                   "",
@@ -177,7 +177,7 @@
           }
         },
         {
-          "name": "2. Create Booking (POST /booking)",
+          "name": "2. Create booking (POST /booking)",
           "event": [
             {
               "listen": "test",
@@ -194,11 +194,11 @@
                   "",
                   "const res = pm.response.json();",
                   "",
-                  "pm.test('Response matches JSON Schema', function () {",
+                  "pm.test('Response matches the create-booking schema', function () {",
                   "    pm.response.to.have.jsonSchema(JSON.parse(pm.variables.get('createResponseSchema')));",
                   "});",
                   "",
-                  "pm.test('Booking payload matches submitted values', function () {",
+                  "pm.test('Booking has the values we sent', function () {",
                   "    pm.expect(res.booking.firstname).to.eql('John');",
                   "    pm.expect(res.booking.lastname).to.eql('Doe');",
                   "    pm.expect(res.booking.totalprice).to.eql(150);",
@@ -240,7 +240,7 @@
           }
         },
         {
-          "name": "3. Update Booking (PUT /booking/:id)",
+          "name": "3. Update booking (PUT /booking/:id)",
           "event": [
             {
               "listen": "test",
@@ -256,10 +256,10 @@
                   "});",
                   "",
                   "const res = pm.response.json();",
-                  "pm.test('PUT response matches booking JSON Schema', function () {",
+                  "pm.test('Response matches the booking schema', function () {",
                   "    pm.response.to.have.jsonSchema(JSON.parse(pm.variables.get('bookingSchema')));",
                   "});",
-                  "pm.test('Updated booking fields are returned in PUT response', function () {",
+                  "pm.test('Response has the updated values', function () {",
                   "    pm.expect(res.firstname).to.eql('Jane');",
                   "    pm.expect(res.lastname).to.eql('Doe');",
                   "    pm.expect(res.totalprice).to.eql(275);",
@@ -304,7 +304,7 @@
           }
         },
         {
-          "name": "4. Verify Updated Booking (GET /booking/:id)",
+          "name": "4. Get booking, check the update (GET /booking/:id)",
           "event": [
             {
               "listen": "test",
@@ -320,10 +320,10 @@
                   "});",
                   "",
                   "const res = pm.response.json();",
-                  "pm.test('GET response matches booking JSON Schema', function () {",
+                  "pm.test('Response matches the booking schema', function () {",
                   "    pm.response.to.have.jsonSchema(JSON.parse(pm.variables.get('bookingSchema')));",
                   "});",
-                  "pm.test('Persisted booking matches updated values', function () {",
+                  "pm.test('Booking was saved with the updated values', function () {",
                   "    pm.expect(res.firstname).to.eql('Jane');",
                   "    pm.expect(res.lastname).to.eql('Doe');",
                   "    pm.expect(res.totalprice).to.eql(275);",
@@ -357,28 +357,28 @@
           }
         },
         {
-          "name": "5. Delete Booking & Verify Removal (DELETE /booking/:id)",
+          "name": "5. Delete booking, check it is gone (DELETE /booking/:id)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "// Note: Restful-Booker returns HTTP 201 Created on successful DELETE",
-                  "pm.test('Status code is 201 Created (Restful-Booker delete confirmation)', function () {",
+                  "// This API answers 201 for a successful delete",
+                  "pm.test('Status is 201 (this API returns 201 for a delete)', function () {",
                   "    pm.response.to.have.status(201);",
                   "});",
                   "",
                   "const baseUrl = pm.variables.get('baseUrl');",
                   "const deletedId = pm.variables.get('bookingId');",
                   "",
-                  "// Immediately verify via GET that the deleted booking returns 404 Not Found",
+                  "// Check the booking is really gone",
                   "pm.sendRequest({",
                   "    url: `${baseUrl}/booking/${deletedId}`,",
                   "    method: 'GET',",
                   "    header: { 'Accept': 'application/json' }",
                   "}, function (err, res) {",
-                  "    pm.test('Follow-up GET on deleted bookingId returns 404 Not Found', function () {",
+                  "    pm.test('GET after delete returns 404', function () {",
                   "        pm.expect(err).to.be.null;",
                   "        pm.expect(res.code).to.eql(404);",
                   "    });",
@@ -411,24 +411,23 @@
       ]
     },
     {
-      "name": "Negative Tests (Self-Contained & State-Verified)",
+      "name": "Negative tests",
       "item": [
         {
-          "name": "1. Negative Auth - Invalid Password (POST /auth)",
+          "name": "N1. Wrong password (POST /auth)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "// Known Restful-Booker API Quirk: POST /auth with bad credentials returns HTTP 200 OK",
-                  "// with body {\"reason\": \"Bad credentials\"} instead of HTTP 401 Unauthorized.",
-                  "pm.test('Status code is 200 OK (known Restful-Booker quirk instead of 401)', function () {",
+                  "// Known quirk: a failed login still returns 200 with a reason in the body (401 would be normal)",
+                  "pm.test('Status is 200 (the API does not return 401 here)', function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
                   "",
                   "const res = pm.response.json();",
-                  "pm.test('Error reason is Bad credentials and no token is issued', function () {",
+                  "pm.test('Body says Bad credentials and has no token', function () {",
                   "    pm.expect(res.reason).to.eql('Bad credentials');",
                   "    pm.expect(res).to.not.have.property('token');",
                   "});"
@@ -460,16 +459,15 @@
           }
         },
         {
-          "name": "2. Negative Create - Missing Required Fields Returns 500 (POST /booking)",
+          "name": "N2. Missing fields (POST /booking)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "// Known Restful-Booker API Defect: Missing required fields causes an unhandled server error",
-                  "// returning 500 Internal Server Error instead of 400 Bad Request.",
-                  "pm.test('Status code is strictly 500 Internal Server Error on missing required fields', function () {",
+                  "// Known defect: missing fields give a server error (500), a 400 would be correct",
+                  "pm.test('Status is 500 (known defect, should be 400)', function () {",
                   "    pm.response.to.have.status(500);",
                   "});"
                 ]
@@ -504,14 +502,14 @@
           }
         },
         {
-          "name": "3. Negative Update - Missing Auth Token & Verify Booking Unchanged (PUT /booking/:id)",
+          "name": "N3. Update without token (PUT /booking/:id)",
           "event": [
             {
               "listen": "prerequest",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "// Provision an isolated booking for this request only, so it can run on its own or in any order",
+                  "// Create a booking just for this request so it can run on its own",
                   "const baseUrl = pm.variables.get('baseUrl');",
                   "pm.sendRequest({",
                   "    url: `${baseUrl}/booking`,",
@@ -541,20 +539,20 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Unauthorized PUT is rejected with 403 Forbidden', function () {",
+                  "pm.test('PUT without token returns 403', function () {",
                   "    pm.response.to.have.status(403);",
                   "});",
                   "",
                   "const baseUrl = pm.variables.get('baseUrl');",
                   "const targetId = pm.variables.get('negPutTargetId');",
                   "",
-                  "// Verify the target booking was NOT modified by the unauthorized PUT, then clean it up",
+                  "// Check the booking was not changed, then clean up",
                   "pm.sendRequest({",
                   "    url: `${baseUrl}/booking/${targetId}`,",
                   "    method: 'GET',",
                   "    header: { 'Accept': 'application/json' }",
                   "}, function (err, res) {",
-                  "    pm.test('Target booking state remains completely unchanged after rejected PUT', function () {",
+                  "    pm.test('Booking is unchanged after the rejected PUT', function () {",
                   "        pm.expect(err).to.be.null;",
                   "        pm.expect(res.code).to.eql(200);",
                   "        const data = res.json();",
@@ -563,7 +561,7 @@
                   "        pm.expect(data.totalprice).to.eql(111);",
                   "    });",
                   "",
-                  "    // Teardown: authenticate with a fresh token (independent of the chained workflow) and delete the target",
+                  "    // Clean up: get a fresh token and delete the test booking",
                   "    const cleanupId = pm.variables.get('negPutTargetId');",
                   "    if (cleanupId) {",
                   "        pm.sendRequest({",
@@ -621,15 +619,15 @@
           }
         },
         {
-          "name": "4. Negative Get - Non-Existent Booking ID (GET /booking/:id)",
+          "name": "N4. Booking does not exist (GET /booking/:id)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "// Uses an independent non-existent ID so this test passes regardless of execution order",
-                  "pm.test('GET for non-existent booking ID returns 404 Not Found', function () {",
+                  "// Fixed ID that does not exist",
+                  "pm.test('Returns 404', function () {",
                   "    pm.response.to.have.status(404);",
                   "});"
                 ]
@@ -657,33 +655,33 @@
           }
         },
         {
-          "name": "5. Negative Delete - Invalid Token, Verify Unchanged & Guaranteed Cleanup (DELETE /booking/:id)",
+          "name": "N5. Delete with bad token (DELETE /booking/:id)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('DELETE with invalid token is rejected with 403 Forbidden', function () {",
+                  "pm.test('DELETE with invalid token returns 403', function () {",
                   "    pm.response.to.have.status(403);",
                   "});",
                   "",
                   "const baseUrl = pm.variables.get('baseUrl');",
                   "const targetId = pm.variables.get('negDeleteTargetId');",
                   "",
-                  "// Prove the booking still exists after the rejected DELETE, then clean it up",
+                  "// Check the booking still exists, then clean up",
                   "pm.sendRequest({",
                   "    url: `${baseUrl}/booking/${targetId}`,",
                   "    method: 'GET',",
                   "    header: { 'Accept': 'application/json' }",
                   "}, function (err, getRes) {",
-                  "    pm.test('Target booking still exists (200 OK) after rejected DELETE', function () {",
+                  "    pm.test('Booking still exists after the rejected DELETE', function () {",
                   "        pm.expect(err).to.be.null;",
                   "        pm.expect(getRes.code).to.eql(200);",
                   "        pm.expect(getRes.json().firstname).to.eql('Immutable');",
                   "    });",
                   "",
-                  "    // Teardown: authenticate with a fresh token (independent of the chained workflow) and delete the target",
+                  "    // Clean up: get a fresh token and delete the test booking",
                   "    const cleanupId = pm.variables.get('negDeleteTargetId');",
                   "    if (cleanupId) {",
                   "        pm.sendRequest({",
@@ -716,7 +714,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "// Provision an isolated booking for this request only, so it can run on its own or in any order",
+                  "// Create a booking just for this request so it can run on its own",
                   "const baseUrl = pm.variables.get('baseUrl');",
                   "pm.sendRequest({",
                   "    url: `${baseUrl}/booking`,",
